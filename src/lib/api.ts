@@ -17,87 +17,74 @@ export interface DownloadStatus {
   downloadUrl?: string;
 }
 
-// This is a mock implementation since we can't run yt-dlp directly in the browser
-// In a real implementation, this would call a backend API
+// Real implementation that calls the backend API
 export async function validateUrl(
   url: string,
 ): Promise<{ valid: boolean; platform?: string }> {
-  // Simple URL validation
   try {
-    new URL(url);
+    const response = await fetch("/api/validate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
 
-    // Identify platform based on URL
-    if (url.includes("youtube.com") || url.includes("youtu.be")) {
-      return { valid: true, platform: "YouTube" };
-    } else if (url.includes("instagram.com")) {
-      return { valid: true, platform: "Instagram" };
-    } else if (url.includes("tiktok.com")) {
-      return { valid: true, platform: "TikTok" };
-    } else if (url.includes("twitter.com") || url.includes("x.com")) {
-      return { valid: true, platform: "Twitter" };
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { valid: false, error: errorData.error };
     }
 
-    return { valid: true, platform: "Unknown" };
-  } catch (e) {
-    return { valid: false };
+    return await response.json();
+  } catch (error) {
+    console.error("Error validating URL:", error);
+    return { valid: false, error: "Network error" };
   }
 }
 
-// Mock function to simulate download process
+// Real function to start a download
 export async function startDownload(
   options: DownloadOptions,
 ): Promise<DownloadStatus> {
-  const { url } = options;
-  const validation = await validateUrl(url);
+  try {
+    const response = await fetch("/api/download", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(options),
+    });
 
-  if (!validation.valid) {
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to start download");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error starting download:", error);
     return {
       id: crypto.randomUUID(),
-      url,
+      url: options.url,
       status: "failed",
       progress: 0,
-      error: "Invalid URL",
+      error: error instanceof Error ? error.message : "Network error",
     };
   }
-
-  if (validation.platform === "Unknown") {
-    return {
-      id: crypto.randomUUID(),
-      url,
-      status: "failed",
-      progress: 0,
-      platform: validation.platform,
-      error: "Unsupported platform",
-    };
-  }
-
-  // Create a download entry
-  const downloadId = crypto.randomUUID();
-
-  return {
-    id: downloadId,
-    url,
-    status: "pending",
-    progress: 0,
-    platform: validation.platform,
-  };
 }
 
-// Mock function to get download progress
+// Real function to get download progress
 export async function getDownloadProgress(id: string): Promise<DownloadStatus> {
-  // In a real implementation, this would check the status from the backend
-  // For demo purposes, we'll simulate progress
+  try {
+    const response = await fetch(`/api/download/${id}`);
 
-  // Simulate random progress between 0-100%
-  const progress = Math.min(Math.random() * 30 + 70, 100);
+    if (!response.ok) {
+      throw new Error("Failed to get download progress");
+    }
 
-  return {
-    id,
-    url: "https://example.com", // In a real implementation, this would be stored
-    status: progress < 100 ? "downloading" : "completed",
-    progress,
-    platform: "Demo",
-    filename: progress === 100 ? "demo-video.mp4" : undefined,
-    downloadUrl: progress === 100 ? "#download-link" : undefined,
-  };
+    return await response.json();
+  } catch (error) {
+    console.error("Error getting download progress:", error);
+    throw error;
+  }
 }
