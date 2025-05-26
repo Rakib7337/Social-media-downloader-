@@ -32,3 +32,6 @@ core
 
 .github/
 
+# Downloaded files
+uploads/
+bin/
