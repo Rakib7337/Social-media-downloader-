@@ -4,7 +4,9 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import fs from "fs-extra";
 import multer from "multer";
-import { YTDlpWrap } from "yt-dlp-wrap";
+import ytDlpWrap from "yt-dlp-wrap";
+
+const { YTDlpWrap } = ytDlpWrap;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

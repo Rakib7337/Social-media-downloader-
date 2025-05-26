@@ -1,7 +1,9 @@
-import { YTDlpWrap } from "yt-dlp-wrap";
+import ytDlpWrap from "yt-dlp-wrap";
 import fs from "fs-extra";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+
+const YTDlpWrap = ytDlpWrap.default || ytDlpWrap;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
