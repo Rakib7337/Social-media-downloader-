@@ -12,10 +12,13 @@ const __dirname = dirname(__filename);
 const binDir = join(__dirname, "..", "bin");
 fs.ensureDirSync(binDir);
 
+// Define the specific output file path for the binary
+const binaryPath = join(binDir, "yt-dlp");
+
 console.log("Installing yt-dlp binary...");
 
-// Download the yt-dlp binary
-YTDlpWrap.downloadFromGithub(binDir)
+// Download the yt-dlp binary to the specific file path
+YTDlpWrap.downloadFromGithub(binaryPath)
   .then(() => {
     console.log("yt-dlp binary installed successfully!");
   })
