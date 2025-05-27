@@ -27,21 +27,26 @@ export default function UrlForm({ onSubmit, isProcessing }: UrlFormProps) {
     e.preventDefault();
     setError(null);
 
-    const validation = await validateUrl(url);
+    try {
+      const validation = await validateUrl(url);
 
-    if (!validation.valid) {
-      setError(validation.error || "Please enter a valid URL");
-      return;
+      if (!validation.valid) {
+        setError(validation.error || "Please enter a valid URL");
+        return;
+      }
+
+      if (validation.platform === "Unknown") {
+        setError("Unsupported platform");
+        return;
+      }
+
+      setPlatform(validation.platform || null);
+      onSubmit({ url, quality, format });
+      setUrl("");
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      setError("Network error - Please make sure the server is running");
     }
-
-    if (validation.platform === "Unknown") {
-      setError("Unsupported platform");
-      return;
-    }
-
-    setPlatform(validation.platform || null);
-    onSubmit({ url, quality, format });
-    setUrl("");
   };
 
   const handleUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

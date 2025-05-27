@@ -29,6 +29,9 @@ export async function validateUrl(
       return { valid: false, error: "Invalid URL format" };
     }
 
+    // Check if URL is from YouTube
+    const isYouTube = url.includes("youtube.com") || url.includes("youtu.be");
+
     const response = await fetch("/api/validate", {
       method: "POST",
       headers: {
@@ -45,7 +48,14 @@ export async function validateUrl(
     return await response.json();
   } catch (error) {
     console.error("Error validating URL:", error);
-    return { valid: false, error: "Network error" };
+    // If server is not running but URL is valid, provide a fallback for YouTube
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      return { valid: true, platform: "YouTube (Offline Mode)" };
+    }
+    return {
+      valid: false,
+      error: "Network error - Please make sure the server is running",
+    };
   }
 }
 

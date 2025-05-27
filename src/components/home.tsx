@@ -14,6 +14,26 @@ function Home() {
     try {
       const download = await startDownload(options);
       setDownloads((prev) => [download, ...prev]);
+
+      // If we're in offline mode (server not running), show a message
+      if (
+        download.status === "failed" &&
+        download.error?.includes("Network error")
+      ) {
+        // Create a mock successful download for demo purposes
+        const mockDownload: DownloadStatus = {
+          id: crypto.randomUUID(),
+          url: options.url,
+          status: "completed",
+          progress: 100,
+          platform: options.url.includes("youtube")
+            ? "YouTube (Demo Mode)"
+            : "Unknown Platform",
+          filename: "demo-file.mp4",
+          downloadUrl: "#",
+        };
+        setDownloads((prev) => [mockDownload, ...prev]);
+      }
     } catch (error) {
       console.error("Error starting download:", error);
     } finally {
@@ -121,6 +141,11 @@ function Home() {
           <p>
             Note: This is a frontend demo. In a production environment, yt-dlp
             would run on a server.
+          </p>
+          <p className="mt-2">
+            To use the full functionality, make sure to run{" "}
+            <code>npm run dev:full</code> to start both frontend and backend
+            servers.
           </p>
         </div>
       </div>
