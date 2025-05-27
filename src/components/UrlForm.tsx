@@ -30,7 +30,7 @@ export default function UrlForm({ onSubmit, isProcessing }: UrlFormProps) {
     const validation = await validateUrl(url);
 
     if (!validation.valid) {
-      setError("Please enter a valid URL");
+      setError(validation.error || "Please enter a valid URL");
       return;
     }
 
@@ -50,10 +50,15 @@ export default function UrlForm({ onSubmit, isProcessing }: UrlFormProps) {
     setError(null);
     setPlatform(null);
 
-    if (newUrl.trim() !== "") {
-      const validation = await validateUrl(newUrl);
-      if (validation.platform) {
-        setPlatform(validation.platform);
+    // Only validate when URL looks complete enough
+    if (newUrl.trim() !== "" && newUrl.includes(".")) {
+      try {
+        const validation = await validateUrl(newUrl);
+        if (validation.valid && validation.platform) {
+          setPlatform(validation.platform);
+        }
+      } catch (err) {
+        // Silently fail on URL change validation
       }
     }
   };

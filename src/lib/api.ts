@@ -20,8 +20,15 @@ export interface DownloadStatus {
 // Real implementation that calls the backend API
 export async function validateUrl(
   url: string,
-): Promise<{ valid: boolean; platform?: string }> {
+): Promise<{ valid: boolean; platform?: string; error?: string }> {
   try {
+    // Basic URL validation before sending to server
+    try {
+      new URL(url);
+    } catch (e) {
+      return { valid: false, error: "Invalid URL format" };
+    }
+
     const response = await fetch("/api/validate", {
       method: "POST",
       headers: {
