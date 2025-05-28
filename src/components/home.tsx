@@ -3,14 +3,8 @@ import UrlForm from "./UrlForm";
 import DownloadItem from "./DownloadItem";
 import { DownloadOptions, DownloadStatus, startDownload } from "../lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import {
-  Download,
-  History,
-  Instagram,
-  TikTok,
-  Twitter,
-  Youtube,
-} from "lucide-react";
+import { Download, History, Instagram, Twitter, Youtube } from "lucide-react";
+import { BrandTiktok as TikTok } from "./ui/custom-icons";
 
 function Home() {
   const [downloads, setDownloads] = useState<DownloadStatus[]>([]);
