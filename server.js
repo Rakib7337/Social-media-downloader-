@@ -6,7 +6,7 @@ import fs from "fs-extra";
 import multer from "multer";
 import ytDlpWrap from "yt-dlp-wrap";
 
-const { YTDlpWrap } = ytDlpWrap;
+const YTDlpWrap = ytDlpWrap.default || ytDlpWrap;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,8 +25,12 @@ fs.ensureDirSync(uploadsDir);
 // Serve static files from the uploads directory
 app.use("/downloads", express.static(uploadsDir));
 
-// Initialize yt-dlp
-const ytDlp = new YTDlpWrap();
+// Path to the yt-dlp binary
+const binDir = join(__dirname, "bin");
+const binaryPath = join(binDir, "yt-dlp");
+
+// Initialize yt-dlp with the binary path
+const ytDlp = new YTDlpWrap(binaryPath);
 
 // Store active downloads
 const activeDownloads = new Map();
