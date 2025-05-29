@@ -13,13 +13,18 @@ function Home() {
   const handleDownload = async (options: DownloadOptions) => {
     setIsProcessing(true);
     try {
+      // First validate the URL to check if server is running
+      const validation = await validateUrl(options.url);
+      const serverRunning = !validation.error?.includes("Network error");
+
       const download = await startDownload(options);
       setDownloads((prev) => [download, ...prev]);
 
       // If we're in offline mode (server not running), show a message
       if (
-        download.status === "failed" &&
-        download.error?.includes("Network error")
+        !serverRunning ||
+        (download.status === "failed" &&
+          download.error?.includes("Network error"))
       ) {
         // Create a mock successful download for demo purposes
         const mockDownload: DownloadStatus = {
@@ -34,6 +39,11 @@ function Home() {
           downloadUrl: "#",
         };
         setDownloads((prev) => [mockDownload, ...prev]);
+
+        // Show a more helpful message to the user
+        console.warn(
+          "Running in offline demo mode. To use actual downloads, make sure to run 'npm run dev:full' to start both frontend and backend servers.",
+        );
       }
     } catch (error) {
       console.error("Error starting download:", error);

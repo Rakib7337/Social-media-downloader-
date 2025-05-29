@@ -84,6 +84,11 @@ app.post("/api/download", async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
+    // Log the download request for debugging
+    console.log(
+      `Download request received for URL: ${url}, format: ${format}, quality: ${quality}`,
+    );
+
     // Generate a unique ID for this download
     const downloadId = Date.now().toString();
     const outputFilename = `${downloadId}.%(ext)s`;
@@ -109,11 +114,21 @@ app.post("/api/download", async (req, res) => {
     // Send initial response
     res.json(downloadStatus);
 
+    // Verify yt-dlp binary exists before starting download
+    if (!fs.existsSync(binaryPath)) {
+      console.error(`yt-dlp binary not found at ${binaryPath}`);
+      downloadStatus.status = "failed";
+      downloadStatus.error = "yt-dlp binary not found";
+      return;
+    }
+
     // Start download process asynchronously
     startDownload(downloadId, url, outputPath, options);
   } catch (error) {
     console.error("Error starting download:", error);
-    res.status(500).json({ error: "Server error" });
+    res
+      .status(500)
+      .json({ error: "Server error: " + (error.message || "Unknown error") });
   }
 });
 
@@ -135,17 +150,28 @@ async function startDownload(downloadId, url, outputPath, options) {
   try {
     // Update status to downloading
     downloadStatus.status = "downloading";
+    console.log(`Starting download for ID: ${downloadId}, URL: ${url}`);
 
     // Get video info to identify platform
     try {
+      console.log(`Getting video info for URL: ${url}`);
       const info = await ytDlp.getVideoInfo(url);
       downloadStatus.platform = getPlatformFromExtractor(info.extractor);
+      console.log(`Platform identified: ${downloadStatus.platform}`);
     } catch (error) {
       console.error("Error getting video info:", error);
+      // Continue with download even if we can't get video info
     }
 
     // Start download with progress tracking
     await new Promise((resolve, reject) => {
+      console.log(`Executing yt-dlp with options:`, [
+        url,
+        "-o",
+        outputPath,
+        ...options,
+      ]);
+
       const download = ytDlp.execPromise([
         url,
         "-o",
@@ -154,17 +180,41 @@ async function startDownload(downloadId, url, outputPath, options) {
         "--newline",
         "--progress-template",
         "%(progress.downloaded_bytes)s/%(progress.total_bytes)s",
+        "--verbose", // Add verbose output for debugging
       ]);
 
       let finalFilename = null;
+      let stdoutData = "";
+      let stderrData = "";
+
+      // Capture stdout for debugging
+      if (download.stdout) {
+        download.stdout.on("data", (data) => {
+          const chunk = data.toString();
+          stdoutData += chunk;
+          console.log(`yt-dlp stdout: ${chunk}`);
+        });
+      }
+
+      // Capture stderr for debugging
+      if (download.stderr) {
+        download.stderr.on("data", (data) => {
+          const chunk = data.toString();
+          stderrData += chunk;
+          console.error(`yt-dlp stderr: ${chunk}`);
+        });
+      }
 
       download.on("progress", (progress) => {
         if (progress && progress.percent) {
           downloadStatus.progress = progress.percent;
+          console.log(`Download progress: ${progress.percent}%`);
         }
       });
 
       download.on("ytDlpEvent", (eventType, eventData) => {
+        console.log(`yt-dlp event: ${eventType}`, eventData);
+
         if (eventType === "download" && eventData) {
           const match = eventData.match(/(\d+)\/(\d+)/);
           if (match && match[1] && match[2]) {
@@ -172,23 +222,36 @@ async function startDownload(downloadId, url, outputPath, options) {
             const total = parseInt(match[2], 10);
             if (total > 0) {
               downloadStatus.progress = Math.round((downloaded / total) * 100);
+              console.log(`Progress updated: ${downloadStatus.progress}%`);
             }
           }
         } else if (eventType === "finished" && eventData) {
           finalFilename = eventData.trim();
+          console.log(`Download finished, filename: ${finalFilename}`);
         }
       });
 
       download
         .then(() => {
+          console.log(`Download promise resolved for ID: ${downloadId}`);
+
           // Find the actual file that was created
           if (!finalFilename) {
+            console.log(
+              `No finalFilename provided, searching in uploads directory...`,
+            );
             const files = fs.readdirSync(uploadsDir);
+            console.log(`Files in uploads directory:`, files);
+
             const downloadFile = files.find((file) =>
               file.startsWith(downloadId),
             );
+
             if (downloadFile) {
               finalFilename = downloadFile;
+              console.log(`Found matching file: ${finalFilename}`);
+            } else {
+              console.log(`No matching file found for ID: ${downloadId}`);
             }
           }
 
@@ -198,10 +261,15 @@ async function startDownload(downloadId, url, outputPath, options) {
             const filePath = join(uploadsDir, finalFilename);
             const newFilePath = join(uploadsDir, safeFilename);
 
+            console.log(`Processing file: ${finalFilename}, ext: ${fileExt}`);
+            console.log(`Original path: ${filePath}`);
+            console.log(`New path: ${newFilePath}`);
+
             // Rename if needed
-            if (filePath !== newFilePath) {
+            if (filePath !== newFilePath && fs.existsSync(filePath)) {
               fs.renameSync(filePath, newFilePath);
               finalFilename = safeFilename;
+              console.log(`File renamed to: ${finalFilename}`);
             }
 
             // Update download status
@@ -209,7 +277,11 @@ async function startDownload(downloadId, url, outputPath, options) {
             downloadStatus.progress = 100;
             downloadStatus.filename = finalFilename;
             downloadStatus.downloadUrl = `/downloads/${finalFilename}`;
+            console.log(
+              `Download status updated to completed: ${downloadStatus.downloadUrl}`,
+            );
           } else {
+            console.error("Download completed but file not found");
             throw new Error("Download completed but file not found");
           }
 
@@ -217,6 +289,8 @@ async function startDownload(downloadId, url, outputPath, options) {
         })
         .catch((error) => {
           console.error("Download error:", error);
+          console.error("stdout:", stdoutData);
+          console.error("stderr:", stderrData);
           downloadStatus.status = "failed";
           downloadStatus.error = error.message || "Download failed";
           reject(error);
@@ -247,6 +321,13 @@ function getPlatformFromExtractor(extractor) {
 // Helper function to get download options based on format and quality
 function getDownloadOptions(format, quality) {
   const options = [];
+
+  // Add common options to improve reliability
+  options.push("--no-check-certificate"); // Skip HTTPS certificate validation
+  options.push("--force-ipv4"); // Force IPv4 to avoid IPv6 issues
+  options.push("--no-warnings"); // Suppress warnings
+  options.push("--ignore-errors"); // Continue on download errors
+  options.push("--no-playlist"); // Download only the video if URL refers to a playlist
 
   // Format options
   if (format === "mp3") {
