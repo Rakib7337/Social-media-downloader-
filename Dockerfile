@@ -2,27 +2,27 @@
 FROM node:20-alpine
 
 # Set working directory
-WORKPACE /app
+WORKDIR /app
 
-# Install dependencies for yt-dlp
+# Install dependencies for yt-dlp and build tools
 RUN apk add --no-cache python3 ffmpeg
 
-# Copy package.json and package-lock.json
+# Copy package.json and package-lock.json first for better caching
 COPY package*.json ./
 
-# Install dependencies
+# Install npm dependencies (faster and more reliable in CI)
 RUN npm ci
 
-# Copy the rest of the application
+# Copy the rest of your application code
 COPY . .
 
-# Run the script to install yt-dlp
+# Install yt-dlp via npm script
 RUN npm run install-yt-dlp
 
 # Build the application
 RUN npm run build
 
-# Expose ports for both frontend and backend
+# Expose frontend and backend ports
 EXPOSE 5173 3001
 
 # Start both servers
